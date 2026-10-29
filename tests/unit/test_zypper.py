@@ -16,6 +16,7 @@
 """Unit tests for Zypper package manager and actions."""
 
 import io
+import subprocess
 from unittest import mock
 
 from craft_packages.zypper import (
@@ -37,11 +38,19 @@ from craft_packages.zypper import (
 
 def test_zypper_refresh():
     action = ZypperRefresh()
-    assert action.get_command() == ["zypper", "--non-interactive", "refresh"]
+    assert action.get_command() == [
+        "zypper",
+        "--xmlout",
+        "--non-interactive",
+        "refresh",
+    ]
 
     output = io.StringIO(
-        "Building repository 'repo-oss' cache [....done]\n"
-        "All repositories have been refreshed.\n"
+        "<?xml version='1.0'?>\n"
+        "<stream>\n"
+        "  <progress name=\"Building repository 'repo-oss' cache\" done=\"1\"/>\n"
+        "  <message type=\"info\">All repositories have been refreshed.</message>\n"
+        "</stream>\n"
     )
     result = action.interpret(output)
     assert result == ZypperRefreshResult(repositories_refreshed=True, repo_count=1)
@@ -51,6 +60,7 @@ def test_zypper_install():
     action = ZypperInstall()
     assert action.get_command(["tree"]) == [
         "zypper",
+        "--xmlout",
         "--non-interactive",
         "install",
         "-y",
@@ -58,6 +68,7 @@ def test_zypper_install():
     ]
     assert action.get_command(["tree"], no_recommends=True) == [
         "zypper",
+        "--xmlout",
         "--non-interactive",
         "install",
         "-y",
@@ -65,7 +76,16 @@ def test_zypper_install():
         "tree",
     ]
 
-    output = io.StringIO("(1/1) Installing: tree-2.2.1-160000.2.2.x86_64 [..done]\n")
+    output = io.StringIO(
+        "<?xml version='1.0'?>\n"
+        "<stream>\n"
+        "  <install-summary>\n"
+        "    <to-install>\n"
+        "      <solvable type=\"package\" name=\"tree\" edition=\"2.2.1-160000.2.2\" arch=\"x86_64\"/>\n"
+        "    </to-install>\n"
+        "  </install-summary>\n"
+        "</stream>\n"
+    )
     installed = action.interpret(output)
     assert installed == ["tree=2.2.1-160000.2.2"]
 
@@ -74,6 +94,7 @@ def test_zypper_remove():
     action = ZypperRemove()
     assert action.get_command(["tree"]) == [
         "zypper",
+        "--xmlout",
         "--non-interactive",
         "remove",
         "-y",
@@ -81,6 +102,7 @@ def test_zypper_remove():
     ]
     assert action.get_command(["tree"], clean_deps=True) == [
         "zypper",
+        "--xmlout",
         "--non-interactive",
         "remove",
         "-y",
@@ -88,22 +110,47 @@ def test_zypper_remove():
         "tree",
     ]
 
-    output = io.StringIO("(1/1) Removing: tree-2.2.1-160000.2.2.x86_64 [..done]\n")
+    output = io.StringIO(
+        "<?xml version='1.0'?>\n"
+        "<stream>\n"
+        "  <install-summary>\n"
+        "    <to-remove>\n"
+        "      <solvable type=\"package\" name=\"tree\" edition=\"2.2.1-160000.2.2\" arch=\"x86_64\"/>\n"
+        "    </to-remove>\n"
+        "  </install-summary>\n"
+        "</stream>\n"
+    )
     removed = action.interpret(output)
     assert removed == ["tree"]
 
 
 def test_zypper_upgrade():
     action = ZypperUpgrade()
-    assert action.get_command() == ["zypper", "--non-interactive", "update", "-y"]
+    assert action.get_command() == [
+        "zypper",
+        "--xmlout",
+        "--non-interactive",
+        "update",
+        "-y",
+    ]
     assert action.get_command(dist_upgrade=True) == [
         "zypper",
+        "--xmlout",
         "--non-interactive",
         "dist-upgrade",
         "-y",
     ]
 
-    output = io.StringIO("(1/1) Installing: tree-2.2.1-160000.2.2.x86_64 [..done]\n")
+    output = io.StringIO(
+        "<?xml version='1.0'?>\n"
+        "<stream>\n"
+        "  <install-summary>\n"
+        "    <to-upgrade>\n"
+        "      <solvable type=\"package\" name=\"tree\" edition=\"2.2.1-160000.2.2\" arch=\"x86_64\"/>\n"
+        "    </to-upgrade>\n"
+        "  </install-summary>\n"
+        "</stream>\n"
+    )
     upgraded = action.interpret(output)
     assert upgraded == ["tree=2.2.1-160000.2.2"]
 
@@ -112,15 +159,21 @@ def test_zypper_search():
     action = ZypperSearch()
     assert action.get_command("tree") == [
         "zypper",
+        "--xmlout",
         "--non-interactive",
         "search",
         "tree",
     ]
 
     output = io.StringIO(
-        "S  | Name | Summary                | Type\n"
-        "---+------+------------------------+--------\n"
-        "i+ | tree | File listing as a tree | package\n"
+        "<?xml version='1.0'?>\n"
+        "<stream>\n"
+        "  <search-result>\n"
+        "    <solvable-list>\n"
+        "      <solvable status=\"not-installed\" name=\"tree\" summary=\"File listing as a tree\" kind=\"package\"/>\n"
+        "    </solvable-list>\n"
+        "  </search-result>\n"
+        "</stream>\n"
     )
     results = action.interpret(output)
     assert results == {"tree": "File listing as a tree"}
@@ -171,6 +224,7 @@ def test_zypper_download():
     action = ZypperDownload()
     assert action.get_command(["tree"]) == [
         "zypper",
+        "--xmlout",
         "--non-interactive",
         "install",
         "-d",
@@ -179,14 +233,26 @@ def test_zypper_download():
     ]
 
     output = io.StringIO(
-        "Retrieving: tree-2.2.1-160000.2.2.x86_64 (repo-oss (16.0)) (1/1),  84.2 KiB\n"
+        "<?xml version='1.0'?>\n"
+        "<stream>\n"
+        "  <install-summary>\n"
+        "    <to-install>\n"
+        "      <solvable type=\"package\" name=\"tree\" edition=\"2.2.1-160000.2.2\" arch=\"x86_64\"/>\n"
+        "    </to-install>\n"
+        "  </install-summary>\n"
+        "</stream>\n"
     )
     assert action.interpret(output) == ["tree"]
 
 
 def test_zypper_clean():
     action = ZypperClean()
-    assert action.get_command() == ["zypper", "--non-interactive", "clean", "-a"]
+    assert action.get_command() == [
+        "zypper",
+        "--non-interactive",
+        "clean",
+        "-a",
+    ]
     assert action.interpret(io.StringIO("")) is None
 
 
@@ -194,13 +260,23 @@ def test_zypper_autoremove():
     action = ZypperAutoremove()
     assert action.get_command() == [
         "zypper",
+        "--xmlout",
         "--non-interactive",
         "remove",
         "--clean-deps",
         "-y",
     ]
 
-    output = io.StringIO("(1/1) Removing: unused-pkg-1.0-1.x86_64 [..done]\n")
+    output = io.StringIO(
+        "<?xml version='1.0'?>\n"
+        "<stream>\n"
+        "  <install-summary>\n"
+        "    <to-remove>\n"
+        "      <solvable type=\"package\" name=\"unused-pkg\" edition=\"1.0-1\" arch=\"x86_64\"/>\n"
+        "    </to-remove>\n"
+        "  </install-summary>\n"
+        "</stream>\n"
+    )
     assert action.interpret(output) == ["unused-pkg"]
 
 
@@ -223,10 +299,24 @@ def test_zypper_manager():
 
     mock_proc = mock.Mock()
     mock_proc.communicate.return_value = (
-        "(1/1) Installing: tree-2.2.1-160000.2.2.x86_64 [..done]\n",
+        "<?xml version='1.0'?>\n"
+        "<stream>\n"
+        "  <install-summary>\n"
+        "    <to-install>\n"
+        "      <solvable type=\"package\" name=\"tree\" edition=\"2.2.1-160000.2.2\" arch=\"x86_64\"/>\n"
+        "    </to-install>\n"
+        "  </install-summary>\n"
+        "</stream>\n",
         "",
     )
     mock_runner.return_value = mock_proc
 
     installed = zypper.install.run(["tree"])
     assert installed == ["tree=2.2.1-160000.2.2"]
+
+    mock_runner.assert_called_with(
+        ["zypper", "--xmlout", "--non-interactive", "install", "-y", "tree"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )

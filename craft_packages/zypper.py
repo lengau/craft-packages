@@ -15,7 +15,7 @@
 # with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Zypper package manager implementation."""
 
-import re
+import xml.etree.ElementTree as ET
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import IO, Any
@@ -35,9 +35,6 @@ from .actions import (
 )
 from .manager import BasePackageManager
 
-_ZYPPER_SEARCH_FIELDS_MIN = 3
-_RPM_NVR_PARTS_COUNT = 3
-
 
 @dataclass(frozen=True)
 class ZypperRefreshResult:
@@ -53,30 +50,45 @@ class ZypperRefresh(RefreshAction[ZypperRefreshResult]):
     def get_command(self, **kwargs: Any) -> list[str]:
         """Return the zypper refresh command."""
         del kwargs
-        return ["zypper", "--non-interactive", "refresh"]
+        return ["zypper", "--xmlout", "--non-interactive", "refresh"]
 
     def interpret(self, stream: IO[str]) -> ZypperRefreshResult:
         """Parse zypper refresh output.
 
         Example command output::
 
-            Building repository 'repo-oss' cache [....done]
-            All repositories have been refreshed.
+            <?xml version='1.0'?>
+            <stream>
+              <progress name="Retrieving repository 'repo-oss' metadata" done="1"/>
+              <message type="info">All repositories have been refreshed.</message>
+            </stream>
 
         Example output:
             ZypperRefreshResult(repositories_refreshed=True, repo_count=1)
         """
-        repos = 0
-        refreshed = False
-        for line in stream:
-            stripped = line.strip()
-            if "All repositories have been refreshed." in stripped:
-                refreshed = True
-            elif (
-                "Building repository" in stripped or "Retrieving repository" in stripped
-            ):
-                repos += 1
-        return ZypperRefreshResult(repositories_refreshed=refreshed, repo_count=repos)
+        content = stream.read().strip()
+        if not content:
+            return ZypperRefreshResult()
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return ZypperRefreshResult()
+
+        refreshed = any(
+            msg.text and "All repositories have been refreshed." in msg.text
+            for msg in root.findall(".//message")
+        )
+        repos = sum(
+            1
+            for prog in root.findall(".//progress")
+            if any(
+                k in prog.attrib.get("name", "")
+                for k in ("Retrieving repository", "Building repository")
+            )
+        )
+        return ZypperRefreshResult(
+            repositories_refreshed=refreshed, repo_count=repos
+        )
 
 
 class ZypperInstall(InstallAction[list[str]]):
@@ -91,7 +103,7 @@ class ZypperInstall(InstallAction[list[str]]):
     ) -> list[str]:
         """Return the zypper install command."""
         del kwargs
-        cmd = ["zypper", "--non-interactive", "install", "-y"]
+        cmd = ["zypper", "--xmlout", "--non-interactive", "install", "-y"]
         if no_recommends:
             cmd.append("--no-recommends")
         cmd.extend(packages)
@@ -102,24 +114,34 @@ class ZypperInstall(InstallAction[list[str]]):
 
         Example command output::
 
-            (1/1) Installing: tree-2.2.1-160000.2.2.x86_64 [..done]
+            <?xml version='1.0'?>
+            <stream>
+              <install-summary>
+                <to-install>
+                  <solvable type="package" name="tree" edition="2.2.1-160000.2.2" arch="x86_64"/>
+                </to-install>
+              </install-summary>
+            </stream>
 
         Example output:
             ["tree=2.2.1-160000.2.2"]
         """
+        content = stream.read().strip()
+        if not content:
+            return []
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return []
+
         installed: list[str] = []
-        pattern = re.compile(r"Installing:\s+(\S+)")
-
-        for line in stream:
-            if match := pattern.search(line):
-                full_pkg = match.group(1)
-                without_arch = full_pkg.rsplit(".", 1)[0]
-                subparts = without_arch.rsplit("-", 2)
-                if len(subparts) == _RPM_NVR_PARTS_COUNT:
-                    installed.append(f"{subparts[0]}={subparts[1]}-{subparts[2]}")
-                else:
-                    installed.append(without_arch)
-
+        for solvable in root.findall(".//to-install/solvable"):
+            name = solvable.attrib.get("name")
+            edition = solvable.attrib.get("edition")
+            if name and edition:
+                installed.append(f"{name}={edition}")
+            elif name:
+                installed.append(name)
         return installed
 
 
@@ -135,7 +157,7 @@ class ZypperRemove(RemoveAction[list[str]]):
     ) -> list[str]:
         """Return the zypper remove command."""
         del kwargs
-        cmd = ["zypper", "--non-interactive", "remove", "-y"]
+        cmd = ["zypper", "--xmlout", "--non-interactive", "remove", "-y"]
         if clean_deps:
             cmd.append("--clean-deps")
         cmd.extend(packages)
@@ -146,27 +168,31 @@ class ZypperRemove(RemoveAction[list[str]]):
 
         Example command output::
 
-            (1/1) Removing: tree-2.2.1-160000.2.2.x86_64 [..done]
+            <?xml version='1.0'?>
+            <stream>
+              <install-summary>
+                <to-remove>
+                  <solvable type="package" name="tree" edition="2.2.1-160000.2.2" arch="x86_64"/>
+                </to-remove>
+              </install-summary>
+            </stream>
 
         Example output:
             ["tree"]
         """
-        removed: list[str] = []
-        pattern = re.compile(r"Removing:\s+(\S+)")
+        content = stream.read().strip()
+        if not content:
+            return []
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return []
 
-        for line in stream:
-            if match := pattern.search(line):
-                full_pkg = match.group(1)
-                without_arch = full_pkg.rsplit(".", 1)[0]
-                subparts = without_arch.rsplit("-", 2)
-                name = (
-                    subparts[0]
-                    if len(subparts) == _RPM_NVR_PARTS_COUNT
-                    else without_arch
-                )
-                removed.append(name)
-
-        return removed
+        return [
+            name
+            for s in root.findall(".//to-remove/solvable")
+            if (name := s.attrib.get("name"))
+        ]
 
 
 class ZypperUpgrade(UpgradeAction[list[str]]):
@@ -182,7 +208,7 @@ class ZypperUpgrade(UpgradeAction[list[str]]):
         """Return the zypper update command."""
         del kwargs
         subcmd = "dist-upgrade" if dist_upgrade else "update"
-        cmd = ["zypper", "--non-interactive", subcmd, "-y"]
+        cmd = ["zypper", "--xmlout", "--non-interactive", subcmd, "-y"]
         if packages:
             cmd.extend(packages)
         return cmd
@@ -192,24 +218,34 @@ class ZypperUpgrade(UpgradeAction[list[str]]):
 
         Example command output::
 
-            (1/1) Installing: tree-2.2.1-160000.2.2.x86_64 [..done]
+            <?xml version='1.0'?>
+            <stream>
+              <install-summary>
+                <to-upgrade>
+                  <solvable type="package" name="tree" edition="2.2.1-160000.2.2" arch="x86_64"/>
+                </to-upgrade>
+              </install-summary>
+            </stream>
 
         Example output:
             ["tree=2.2.1-160000.2.2"]
         """
+        content = stream.read().strip()
+        if not content:
+            return []
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return []
+
         upgraded: list[str] = []
-        pattern = re.compile(r"Installing:\s+(\S+)")
-
-        for line in stream:
-            if match := pattern.search(line):
-                full_pkg = match.group(1)
-                without_arch = full_pkg.rsplit(".", 1)[0]
-                subparts = without_arch.rsplit("-", 2)
-                if len(subparts) == _RPM_NVR_PARTS_COUNT:
-                    upgraded.append(f"{subparts[0]}={subparts[1]}-{subparts[2]}")
-                else:
-                    upgraded.append(without_arch)
-
+        for solvable in root.findall(".//to-upgrade/solvable"):
+            name = solvable.attrib.get("name")
+            edition = solvable.attrib.get("edition")
+            if name and edition:
+                upgraded.append(f"{name}={edition}")
+            elif name:
+                upgraded.append(name)
         return upgraded
 
 
@@ -219,29 +255,38 @@ class ZypperSearch(SearchAction[dict[str, str]]):
     def get_command(self, query: str, **kwargs: Any) -> list[str]:
         """Return the zypper search command."""
         del kwargs
-        return ["zypper", "--non-interactive", "search", query]
+        return ["zypper", "--xmlout", "--non-interactive", "search", query]
 
     def interpret(self, stream: IO[str]) -> dict[str, str]:
         """Parse zypper search table output.
 
         Example command output::
 
-            S  | Name | Summary                | Type
-            ---+------+------------------------+--------
-            i+ | tree | File listing as a tree | package
+            <?xml version='1.0'?>
+            <stream>
+              <search-result>
+                <solvable-list>
+                  <solvable status="not-installed" name="tree" summary="File listing as a tree" kind="package"/>
+                </solvable-list>
+              </search-result>
+            </stream>
 
         Example output:
             {"tree": "File listing as a tree"}
         """
+        content = stream.read().strip()
+        if not content:
+            return {}
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return {}
+
         results: dict[str, str] = {}
-        for line in stream:
-            if "|" in line and not line.startswith(("-", "S  |", "Loading")):
-                parts = [p.strip() for p in line.split("|")]
-                if len(parts) >= _ZYPPER_SEARCH_FIELDS_MIN:
-                    name = parts[1]
-                    summary = parts[2]
-                    if name and name != "Name":
-                        results[name] = summary
+        for s in root.findall(".//search-result/solvable-list/solvable"):
+            name = s.attrib.get("name")
+            if name:
+                results[name] = s.attrib.get("summary", "")
         return results
 
 
@@ -340,7 +385,7 @@ class ZypperDownload(DownloadAction[list[str]]):
     ) -> list[str]:
         """Return the zypper download command."""
         del kwargs
-        cmd = ["zypper", "--non-interactive", "install", "-d", "-y"]
+        cmd = ["zypper", "--xmlout", "--non-interactive", "install", "-d", "-y"]
         cmd.extend(packages)
         return cmd
 
@@ -349,27 +394,31 @@ class ZypperDownload(DownloadAction[list[str]]):
 
         Example command output::
 
-            Retrieving: tree-2.2.1-160000.2.2.x86_64 (repo-oss (16.0)) (1/1),  84.2 KiB
+            <?xml version='1.0'?>
+            <stream>
+              <install-summary>
+                <to-install>
+                  <solvable type="package" name="tree" edition="2.2.1-160000.2.2" arch="x86_64"/>
+                </to-install>
+              </install-summary>
+            </stream>
 
         Example output:
             ["tree"]
         """
-        downloaded: list[str] = []
-        pattern = re.compile(r"Retrieving:\s+(\S+)")
+        content = stream.read().strip()
+        if not content:
+            return []
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return []
 
-        for line in stream:
-            if match := pattern.search(line):
-                full_pkg = match.group(1)
-                without_arch = full_pkg.rsplit(".", 1)[0]
-                subparts = without_arch.rsplit("-", 2)
-                name = (
-                    subparts[0]
-                    if len(subparts) == _RPM_NVR_PARTS_COUNT
-                    else without_arch
-                )
-                downloaded.append(name)
-
-        return downloaded
+        return [
+            name
+            for s in root.findall(".//to-install/solvable")
+            if (name := s.attrib.get("name"))
+        ]
 
 
 class ZypperClean(CleanAction[None]):
@@ -397,34 +446,45 @@ class ZypperAutoremove(AutoremoveAction[list[str]]):
     def get_command(self, **kwargs: Any) -> list[str]:
         """Return the zypper autoremove command."""
         del kwargs
-        return ["zypper", "--non-interactive", "remove", "--clean-deps", "-y"]
+        return [
+            "zypper",
+            "--xmlout",
+            "--non-interactive",
+            "remove",
+            "--clean-deps",
+            "-y",
+        ]
 
     def interpret(self, stream: IO[str]) -> list[str]:
         """Parse removed packages from zypper remove output.
 
         Example command output::
 
-            (1/1) Removing: unused-pkg-1.0-1.x86_64 [..done]
+            <?xml version='1.0'?>
+            <stream>
+              <install-summary>
+                <to-remove>
+                  <solvable type="package" name="unused-pkg" edition="1.0-1" arch="x86_64"/>
+                </to-remove>
+              </install-summary>
+            </stream>
 
         Example output:
             ["unused-pkg"]
         """
-        removed: list[str] = []
-        pattern = re.compile(r"Removing:\s+(\S+)")
+        content = stream.read().strip()
+        if not content:
+            return []
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return []
 
-        for line in stream:
-            if match := pattern.search(line):
-                full_pkg = match.group(1)
-                without_arch = full_pkg.rsplit(".", 1)[0]
-                subparts = without_arch.rsplit("-", 2)
-                name = (
-                    subparts[0]
-                    if len(subparts) == _RPM_NVR_PARTS_COUNT
-                    else without_arch
-                )
-                removed.append(name)
-
-        return removed
+        return [
+            name
+            for s in root.findall(".//to-remove/solvable")
+            if (name := s.attrib.get("name"))
+        ]
 
 
 class Zypper(BasePackageManager):
