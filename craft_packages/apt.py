@@ -55,7 +55,18 @@ class AptRefresh(RefreshAction[AptRefreshResult]):
         return ["apt-get", "update"]
 
     def interpret(self, stream: IO[str]) -> AptRefreshResult:
-        """Parse apt-get update output."""
+        """Parse apt-get update output.
+
+        Example command output::
+
+            Hit:1 http://archive.ubuntu.com/ubuntu noble InRelease
+            Get:2 http://archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+            Ign:3 http://archive.ubuntu.com/ubuntu noble/main Translation-en
+            Err:4 http://archive.ubuntu.com/ubuntu noble Release
+
+        Example output:
+            AptRefreshResult(hits=1, gets=1, ignored=1, errors=1)
+        """
         hits = gets = ignored = errors = 0
         for line in stream:
             stripped = line.strip()
@@ -92,7 +103,16 @@ class AptInstall(InstallAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse installed packages from apt-get output."""
+        """Parse installed packages from apt-get output.
+
+        Example command output::
+
+            Setting up curl (7.81.0-1ubuntu1.16) ...
+            Setting up libcurl4:amd64 (7.81.0-1ubuntu1.16) ...
+
+        Example output:
+            ["curl=7.81.0-1ubuntu1.16", "libcurl4=7.81.0-1ubuntu1.16"]
+        """
         pattern = re.compile(r"^Setting up\s+([^\s:]+)(?::\S+)?\s+\(([^)]+)\)")
         return [
             f"{match.group(1)}={match.group(2)}"
@@ -122,7 +142,16 @@ class AptRemove(RemoveAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse removed packages from apt-get output."""
+        """Parse removed packages from apt-get output.
+
+        Example command output::
+
+            Removing curl (7.81.0-1ubuntu1.16) ...
+            Purging configuration files for curl (7.81.0-1ubuntu1.16) ...
+
+        Example output:
+            ["curl"]
+        """
         removed: list[str] = []
         pattern = re.compile(
             r"^(?:Removing|Purging configuration files for)\s+([^\s:]+)"
@@ -154,7 +183,15 @@ class AptUpgrade(UpgradeAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse upgraded packages from apt-get output."""
+        """Parse upgraded packages from apt-get output.
+
+        Example command output::
+
+            Setting up tzdata (2024a-0ubuntu0.22.04.1) ...
+
+        Example output:
+            ["tzdata=2024a-0ubuntu0.22.04.1"]
+        """
         pattern = re.compile(r"^Setting up\s+([^\s:]+)(?::\S+)?\s+\(([^)]+)\)")
         return [
             f"{match.group(1)}={match.group(2)}"
@@ -178,7 +215,19 @@ class AptSearch(SearchAction[dict[str, str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> dict[str, str]:
-        """Parse package search results."""
+        """Parse package search results.
+
+        Example command output::
+
+            curl - command line tool for transferring data with URL syntax
+            libcurl4 - easy-to-use client-side URL transfer library
+
+        Example output:
+            {
+                "curl": "command line tool for transferring data with URL syntax",
+                "libcurl4": "easy-to-use client-side URL transfer library",
+            }
+        """
         results: dict[str, str] = {}
         for line in stream:
             line_str = line.strip()
@@ -197,7 +246,23 @@ class AptInfo(InfoAction[dict[str, str]]):
         return ["apt-cache", "show", package]
 
     def interpret(self, stream: IO[str]) -> dict[str, str]:
-        """Parse RFC822 package information stanza."""
+        """Parse RFC822 package information stanza.
+
+        Example command output::
+
+            Package: curl
+            Version: 7.81.0-1ubuntu1.16
+            Section: web
+            Description: command line tool for transferring data with URL syntax
+
+        Example output:
+            {
+                "Package": "curl",
+                "Version": "7.81.0-1ubuntu1.16",
+                "Section": "web",
+                "Description": "command line tool for transferring data with URL syntax",
+            }
+        """
         info: dict[str, str] = {}
         current_key: str | None = None
         for line in stream:
@@ -235,7 +300,16 @@ class AptListInstalled(ListInstalledAction[list[str]]):
         return ["dpkg-query", "-W", "-f=${Package}\t${Status}\t${Version}\n"]
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse installed packages into package=version strings."""
+        r"""Parse installed packages into package=version strings.
+
+        Example command output::
+
+            curl\tinstall ok installed\t7.81.0-1ubuntu1.16
+            libc6\tinstall ok installed\t2.35-0ubuntu3.8
+
+        Example output:
+            ["curl=7.81.0-1ubuntu1.16", "libc6=2.35-0ubuntu3.8"]
+        """
         packages: list[str] = []
         for line in stream:
             parts = line.strip().split("\t")
@@ -253,7 +327,15 @@ class AptIsInstalled(IsInstalledAction[bool]):
         return ["dpkg-query", "-W", "-f=${Status}\n", package]
 
     def interpret(self, stream: IO[str]) -> bool:
-        """Parse dpkg-query status output."""
+        """Parse dpkg-query status output.
+
+        Example command output::
+
+            install ok installed
+
+        Example output:
+            True
+        """
         line = stream.read().strip()
         return _is_dpkg_installed(line) if line else False
 
@@ -277,7 +359,15 @@ class AptDownload(DownloadAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse downloaded package names from apt-get output."""
+        """Parse downloaded package names from apt-get output.
+
+        Example command output::
+
+            Get:1 http://archive.ubuntu.com/ubuntu noble/main amd64 curl amd64 7.81.0-1ubuntu1.16 [194 kB]
+
+        Example output:
+            ["curl"]
+        """
         pattern = re.compile(
             r"^Get:\d+\s+\S+\s+\S+\s+(?:(?:amd64|arm64|armhf|i386|all|riscv64|s390x|ppc64el)\s+)?([^\s:]+)"
         )
@@ -295,7 +385,13 @@ class AptClean(CleanAction[None]):
         return ["apt-get", "clean"]
 
     def interpret(self, stream: IO[str]) -> None:
-        """Return None as apt-get clean produces no structured output."""
+        """Parse clean output.
+
+        apt-get clean produces no structured output.
+
+        Example output:
+            None
+        """
         del stream
 
 
@@ -311,7 +407,15 @@ class AptAutoremove(AutoremoveAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse removed packages from autoremove output."""
+        """Parse removed packages from autoremove output.
+
+        Example command output::
+
+            Removing libcurl4 (7.81.0-1ubuntu1.16) ...
+
+        Example output:
+            ["libcurl4"]
+        """
         removed: list[str] = []
         pattern = re.compile(
             r"^(?:Removing|Purging configuration files for)\s+([^\s:]+)"
