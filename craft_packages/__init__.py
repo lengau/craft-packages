@@ -55,6 +55,21 @@ from .apt import (
     AptUpgrade,
 )
 from .manager import BasePackageManager
+from .yum import (
+    Yum,
+    YumAutoremove,
+    YumClean,
+    YumDownload,
+    YumInfo,
+    YumInstall,
+    YumIsInstalled,
+    YumListInstalled,
+    YumRefresh,
+    YumRefreshResult,
+    YumRemove,
+    YumSearch,
+    YumUpgrade,
+)
 
 __all__ = [
     "Action",
@@ -83,5 +98,18 @@ __all__ = [
     "RemoveAction",
     "SearchAction",
     "UpgradeAction",
+    "Yum",
+    "YumAutoremove",
+    "YumClean",
+    "YumDownload",
+    "YumInfo",
+    "YumInstall",
+    "YumIsInstalled",
+    "YumListInstalled",
+    "YumRefresh",
+    "YumRefreshResult",
+    "YumRemove",
+    "YumSearch",
+    "YumUpgrade",
     "__version__",
 ]
