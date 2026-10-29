@@ -26,11 +26,11 @@ def project_main_module() -> types.ModuleType:
     """
     try:
         # This should be the project's main package; downstream projects must update this.
-        import starcraft
+        import craft_packages  # noqa: PLC0415
 
-        main_module = starcraft
+        main_module = craft_packages
     except ImportError:
         pytest.fail(
-            "Failed to import the project's main module: check if it needs updating",
+            reason="Failed to import the project's main module: check if it needs updating",  # ty: ignore[unknown-argument]
         )
     return main_module

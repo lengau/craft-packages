@@ -66,7 +66,7 @@ ifneq ($(CI),)
 endif
 
 .PHONY: setup-lint
-setup-lint: install-uv install-shellcheck install-pyright install-lint-build-deps  ##- Set up a linting-only environment
+setup-lint: install-uv install-shellcheck install-ty install-lint-build-deps  ##- Set up a linting-only environment
 	uv sync $(UV_LINT_GROUPS)
 
 .PHONY: setup-docs
@@ -125,26 +125,12 @@ ifneq ($(CI),)
 	@echo ::endgroup::
 endif
 
-.PHONY: lint-mypy
-lint-mypy:  ##- Check types with mypy
+.PHONY: lint-ty
+lint-ty:  ##- Check types with ty
 ifneq ($(CI),)
 	@echo ::group::$@
 endif
-	uv run mypy --show-traceback --show-error-codes $(PROJECT)
-ifneq ($(CI),)
-	@echo ::endgroup::
-endif
-
-.PHONY: lint-pyright
-lint-pyright:  ##- Check types with pyright
-ifneq ($(CI),)
-	@echo ::group::$@
-endif
-ifneq ($(shell which pyright),) # Prefer the system pyright
-	pyright --pythonpath .venv/bin/python
-else
-	uv tool run pyright --pythonpath .venv/bin/python
-endif
+	ty check
 ifneq ($(CI),)
 	@echo ::endgroup::
 endif
@@ -267,15 +253,14 @@ else
 	$(warning Codespell not installed. Please install it yourself.)
 endif
 
-.PHONY: install-pyright
-install-pyright: install-uv
-ifneq ($(shell which pyright),)
+.PHONY: install-ty
+install-ty:
+ifneq ($(shell which ty),)
 else ifneq ($(shell which snap),)
-	sudo snap install --classic pyright
+	sudo snap install --beta astral-ty
+	sudo snap alias astral-ty.ty ty
 else
-	# Workaround for a bug in npm
-	[ -d "$(HOME)/.npm/_cacache" ] && chown -R `id -u`:`id -g` "$(HOME)/.npm" || true
-	uv tool install pyright
+	$(warning ty not installed. Please install it yourself.)
 endif
 
 .PHONY: install-ruff

@@ -16,31 +16,8 @@
 """Basic Starcraft package demo unit tests."""
 
 # pyright: reportFunctionMemberAccess=false
-from unittest import mock
-
-import starcraft
+import craft_packages
 
 
 def test_version():
-    assert starcraft.__version__ is not None
-
-
-def test_hello(mocker):
-    mocker.patch("builtins.print")
-
-    starcraft.hello()
-
-    print.assert_called_once_with("Hello *craft team!")
-
-
-def test_hello_people(mocker):
-    mocker.patch("builtins.print")
-
-    starcraft.hello(["people"])
-
-    print.assert_has_calls(
-        [
-            mock.call("Hello *craft team!"),
-            mock.call("Hello people!"),
-        ],
-    )
+    assert craft_packages.__version__ is not None
