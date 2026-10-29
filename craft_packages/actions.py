@@ -16,6 +16,7 @@
 """Base action abstractions for package manager operations."""
 
 import abc
+import io
 import subprocess
 from collections.abc import Callable, Sequence
 from typing import IO, Any, Generic, TypeVar
@@ -35,13 +36,13 @@ class Action(abc.ABC, Generic[T]):
     def get_command(self, *args: Any, **kwargs: Any) -> list[str]:
         """Return the command as a list of strings."""
 
-    def run(
+    def start(
         self,
         *args: Any,
         runner_kwargs: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> subprocess.Popen[Any]:
-        """Execute the command using the configured runner."""
+        """Start the command using the configured runner and return the Popen object."""
         cmd = self.get_command(*args, **kwargs)
         default_kwargs: dict[str, Any] = {
             "stdout": subprocess.PIPE,
@@ -51,6 +52,17 @@ class Action(abc.ABC, Generic[T]):
         if runner_kwargs:
             default_kwargs.update(runner_kwargs)
         return self._runner(cmd, **default_kwargs)
+
+    def run(
+        self,
+        *args: Any,
+        runner_kwargs: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> T:
+        """Run the command to completion and return interpreted output."""
+        proc = self.start(*args, runner_kwargs=runner_kwargs, **kwargs)
+        stdout, _ = proc.communicate()
+        return self.interpret(io.StringIO(stdout))
 
     @abc.abstractmethod
     def interpret(self, stream: IO[str]) -> T:

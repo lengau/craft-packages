@@ -58,12 +58,13 @@ def test_action_get_command():
     assert action.get_command("pkg-a", flag=True) == ["dummy", "run", "--flag", "pkg-a"]
 
 
-def test_action_run():
+def test_action_start():
     mock_runner = mock.Mock()
     action = DummyAction(runner=mock_runner)
 
-    action.run("pkg-a", flag=True)
+    proc = action.start("pkg-a", flag=True)
 
+    assert proc is mock_runner.return_value
     mock_runner.assert_called_once_with(
         ["dummy", "run", "--flag", "pkg-a"],
         stdout=subprocess.PIPE,
@@ -72,11 +73,11 @@ def test_action_run():
     )
 
 
-def test_action_run_custom_kwargs():
+def test_action_start_custom_kwargs():
     mock_runner = mock.Mock()
     action = DummyAction(runner=mock_runner)
 
-    action.run("pkg-a", runner_kwargs={"cwd": "/tmp", "text": False})
+    action.start("pkg-a", runner_kwargs={"cwd": "/tmp", "text": False})
 
     mock_runner.assert_called_once_with(
         ["dummy", "run", "pkg-a"],
@@ -85,6 +86,24 @@ def test_action_run_custom_kwargs():
         text=False,
         cwd="/tmp",
     )
+
+
+def test_action_run():
+    mock_proc = mock.Mock()
+    mock_proc.communicate.return_value = ("pkg1\npkg2\n", "")
+    mock_runner = mock.Mock(return_value=mock_proc)
+    action = DummyAction(runner=mock_runner)
+
+    result = action.run("pkg-a", flag=True)
+
+    assert result == ["pkg1", "pkg2"]
+    mock_runner.assert_called_once_with(
+        ["dummy", "run", "--flag", "pkg-a"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    mock_proc.communicate.assert_called_once()
 
 
 def test_action_interpret_and_parse():

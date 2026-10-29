@@ -253,8 +253,17 @@ def test_apt_manager():
     assert apt.clean._runner is mock_runner
     assert apt.autoremove._runner is mock_runner
 
-    apt.install.run(["curl"])
-    mock_runner.assert_called_once_with(
+    mock_proc = mock.Mock()
+    mock_proc.communicate.return_value = (
+        "Setting up curl (7.81.0-1ubuntu1.16) ...\n",
+        "",
+    )
+    mock_runner.return_value = mock_proc
+
+    installed = apt.install.run(["curl"])
+    assert installed == ["curl=7.81.0-1ubuntu1.16"]
+
+    mock_runner.assert_called_with(
         ["apt-get", "install", "-y", "curl"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
