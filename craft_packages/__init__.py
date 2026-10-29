@@ -55,6 +55,21 @@ from .apt import (
     AptUpgrade,
 )
 from .manager import BasePackageManager
+from .zypper import (
+    Zypper,
+    ZypperAutoremove,
+    ZypperClean,
+    ZypperDownload,
+    ZypperInfo,
+    ZypperInstall,
+    ZypperIsInstalled,
+    ZypperListInstalled,
+    ZypperRefresh,
+    ZypperRefreshResult,
+    ZypperRemove,
+    ZypperSearch,
+    ZypperUpgrade,
+)
 
 __all__ = [
     "Action",
@@ -83,5 +98,18 @@ __all__ = [
     "RemoveAction",
     "SearchAction",
     "UpgradeAction",
+    "Zypper",
+    "ZypperAutoremove",
+    "ZypperClean",
+    "ZypperDownload",
+    "ZypperInfo",
+    "ZypperInstall",
+    "ZypperIsInstalled",
+    "ZypperListInstalled",
+    "ZypperRefresh",
+    "ZypperRefreshResult",
+    "ZypperRemove",
+    "ZypperSearch",
+    "ZypperUpgrade",
     "__version__",
 ]
