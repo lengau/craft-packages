@@ -66,7 +66,16 @@ class DnfRefresh(RefreshAction[DnfRefreshResult]):
         return ["dnf", "makecache"]
 
     def interpret(self, stream: IO[str]) -> DnfRefreshResult:
-        """Parse dnf makecache output."""
+        """Parse dnf makecache output.
+
+        Example command output::
+
+            CentOS Stream 9 - BaseOS                          5.4 kB/s | 5.4 kB 00:00
+            Metadata cache created.
+
+        Example output:
+            DnfRefreshResult(metadata_cache_created=True, repo_count=1)
+        """
         repos = 0
         cache_created = False
         for line in stream:
@@ -75,9 +84,7 @@ class DnfRefresh(RefreshAction[DnfRefreshResult]):
                 cache_created = True
             elif "|" in stripped or "Metadata" in stripped:
                 repos += 1
-        return DnfRefreshResult(
-            metadata_cache_created=cache_created, repo_count=repos
-        )
+        return DnfRefreshResult(metadata_cache_created=cache_created, repo_count=repos)
 
 
 class DnfInstall(InstallAction[list[str]]):
@@ -99,7 +106,17 @@ class DnfInstall(InstallAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse installed packages from dnf output."""
+        """Parse installed packages from dnf output.
+
+        Example command output::
+
+            Installed:
+              tree-1.8.0-10.el9.x86_64
+            Complete!
+
+        Example output:
+            ["tree=1.8.0-10.el9"]
+        """
         installed: list[str] = []
         in_section = False
 
@@ -134,9 +151,7 @@ class DnfInstall(InstallAction[list[str]]):
                     without_arch = parts[0].rsplit(".", 1)[0]
                     subparts = without_arch.rsplit("-", 2)
                     if len(subparts) == _RPM_NVR_PARTS_COUNT:
-                        installed.append(
-                            f"{subparts[0]}={subparts[1]}-{subparts[2]}"
-                        )
+                        installed.append(f"{subparts[0]}={subparts[1]}-{subparts[2]}")
                     else:
                         installed.append(without_arch)
 
@@ -162,7 +177,17 @@ class DnfRemove(RemoveAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse removed packages from dnf output."""
+        """Parse removed packages from dnf output.
+
+        Example command output::
+
+            Removed:
+              tree.x86_64 1.8.0-10.el9
+            Complete!
+
+        Example output:
+            ["tree"]
+        """
         removed: list[str] = []
         in_section = False
 
@@ -206,7 +231,17 @@ class DnfUpgrade(UpgradeAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse upgraded packages from dnf output."""
+        """Parse upgraded packages from dnf output.
+
+        Example command output::
+
+            Upgraded:
+              tree.x86_64 1.8.1-1.el9
+            Complete!
+
+        Example output:
+            ["tree=1.8.1-1.el9"]
+        """
         upgraded: list[str] = []
         in_section = False
 
@@ -234,9 +269,7 @@ class DnfUpgrade(UpgradeAction[list[str]]):
                     without_arch = parts[0].rsplit(".", 1)[0]
                     subparts = without_arch.rsplit("-", 2)
                     if len(subparts) == _RPM_NVR_PARTS_COUNT:
-                        upgraded.append(
-                            f"{subparts[0]}={subparts[1]}-{subparts[2]}"
-                        )
+                        upgraded.append(f"{subparts[0]}={subparts[1]}-{subparts[2]}")
                     else:
                         upgraded.append(without_arch)
 
@@ -252,7 +285,15 @@ class DnfSearch(SearchAction[dict[str, str]]):
         return ["dnf", "search", query]
 
     def interpret(self, stream: IO[str]) -> dict[str, str]:
-        """Parse dnf search output."""
+        """Parse dnf search output.
+
+        Example command output::
+
+            tree.x86_64 : File system tree viewer
+
+        Example output:
+            {"tree": "File system tree viewer"}
+        """
         results: dict[str, str] = {}
         for line in stream:
             stripped = line.strip()
@@ -276,7 +317,23 @@ class DnfInfo(InfoAction[dict[str, str]]):
         return ["dnf", "info", package]
 
     def interpret(self, stream: IO[str]) -> dict[str, str]:
-        """Parse dnf info key-value output."""
+        """Parse dnf info key-value output.
+
+        Example command output::
+
+            Name         : tree
+            Version      : 1.8.0
+            Release      : 10.el9
+            Description  : File system tree viewer
+
+        Example output:
+            {
+                "Name": "tree",
+                "Version": "1.8.0",
+                "Release": "10.el9",
+                "Description": "File system tree viewer",
+            }
+        """
         info: dict[str, str] = {}
         current_key: str | None = None
 
@@ -301,11 +358,18 @@ class DnfListInstalled(ListInstalledAction[list[str]]):
         return ["rpm", "-qa", "--qf", "%{NAME}=%{VERSION}-%{RELEASE}\n"]
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse installed packages into package=version strings."""
+        """Parse installed packages into package=version strings.
+
+        Example command output::
+
+            tree=1.8.0-10.el9
+            tzdata=2024a-1.el9
+
+        Example output:
+            ["tree=1.8.0-10.el9", "tzdata=2024a-1.el9"]
+        """
         return sorted(
-            line.strip()
-            for line in stream
-            if line.strip() and "=" in line.strip()
+            line.strip() for line in stream if line.strip() and "=" in line.strip()
         )
 
 
@@ -318,7 +382,15 @@ class DnfIsInstalled(IsInstalledAction[bool]):
         return ["rpm", "-q", package]
 
     def interpret(self, stream: IO[str]) -> bool:
-        """Parse rpm -q output."""
+        """Parse rpm -q output.
+
+        Example command output::
+
+            tree-1.8.0-10.el9.x86_64
+
+        Example output:
+            True
+        """
         content = stream.read().strip()
         if not content:
             return False
@@ -344,7 +416,17 @@ class DnfDownload(DownloadAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse downloaded package names from dnf output."""
+        """Parse downloaded package names from dnf output.
+
+        Example command output::
+
+            Downloading Packages:
+            tree-1.8.0-10.el9.x86_64.rpm  56 kB/s | 56 kB 00:00
+            Complete!
+
+        Example output:
+            ["tree"]
+        """
         downloaded: list[str] = []
         in_section = False
         rpm_pattern = re.compile(r"^\s*(\S+)\.rpm")
@@ -381,7 +463,13 @@ class DnfClean(CleanAction[None]):
         return ["dnf", "clean", "all"]
 
     def interpret(self, stream: IO[str]) -> None:
-        """Return None as dnf clean produces no structured output."""
+        """Parse dnf clean output.
+
+        dnf clean produces no structured output.
+
+        Example output:
+            None
+        """
         del stream
 
 
@@ -394,7 +482,17 @@ class DnfAutoremove(AutoremoveAction[list[str]]):
         return ["dnf", "autoremove", "-y"]
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse removed packages from dnf autoremove output."""
+        """Parse removed packages from dnf autoremove output.
+
+        Example command output::
+
+            Removed:
+              old-dep.x86_64 1.0-1
+            Complete!
+
+        Example output:
+            ["old-dep"]
+        """
         removed: list[str] = []
         in_section = False
 
