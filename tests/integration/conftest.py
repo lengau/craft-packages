@@ -17,6 +17,7 @@
 
 import contextlib
 import subprocess
+import time
 import uuid
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -25,7 +26,23 @@ from typing import Any
 import pylxd
 import pylxd.exceptions
 import pytest
+from craft_packages.apk import Apk
 from craft_packages.apt import Apt
+
+
+def _wait_for_container(container: Any) -> None:
+    """Wait for container network and system initialization."""
+    for _ in range(30):
+        if container.execute(["ip", "route", "get", "1.1.1.1"]).exit_code == 0:
+            break
+        time.sleep(0.5)
+    container.execute(
+        [
+            "sh",
+            "-c",
+            "command -v cloud-init >/dev/null && cloud-init status --wait || true",
+        ]
+    )
 
 
 @dataclass(frozen=True)
@@ -111,10 +128,7 @@ def lxd_container(request: pytest.FixtureRequest) -> Generator[Any, None, None]:
     container: Any = client.containers.create(config, wait=True)
     container.start(wait=True)
 
-    # Wait for cloud-init if present
-    res = container.execute(["which", "cloud-init"])
-    if res.exit_code == 0:
-        container.execute(["cloud-init", "status", "--wait"])
+    _wait_for_container(container)
 
     yield container
 
@@ -133,3 +147,64 @@ def apt_container(lxd_container: Any) -> Apt:
         return subprocess.Popen(exec_cmd, **kwargs)
 
     return Apt(runner=container_runner)
+
+
+APK_IMAGE_SPECS: list[ImageSpec] = [
+    ImageSpec("alpine-3.21", "https://images.lxd.canonical.com", "alpine/3.21"),
+    ImageSpec("alpine-3.22", "https://images.lxd.canonical.com", "alpine/3.22"),
+    ImageSpec("alpine-3.23", "https://images.lxd.canonical.com", "alpine/3.23"),
+]
+
+
+@pytest.fixture(
+    scope="session",
+    params=APK_IMAGE_SPECS,
+    ids=[spec.name for spec in APK_IMAGE_SPECS],
+)
+def apk_lxd_container(request: pytest.FixtureRequest) -> Generator[Any, None, None]:
+    """Start an LXD container across Alpine Linux distributions."""
+    spec: ImageSpec = request.param
+    try:
+        client: Any = pylxd.Client()
+        if not client.trusted:
+            pytest.skip("LXD client is not trusted")  # ty: ignore[too-many-positional-arguments]
+    except (
+        pylxd.exceptions.ClientConnectionFailed,
+        pylxd.exceptions.LXDAPIException,
+    ) as exc:
+        pytest.skip(f"LXD is not available: {exc}")  # ty: ignore[too-many-positional-arguments]
+
+    name = f"test-cp-{spec.name.replace('.', '-')}-{uuid.uuid4().hex[:6]}"
+    config = {
+        "name": name,
+        "source": {
+            "type": "image",
+            "mode": "pull",
+            "server": spec.server,
+            "protocol": "simplestreams",
+            "alias": spec.alias,
+        },
+    }
+
+    container: Any = client.containers.create(config, wait=True)
+    container.start(wait=True)
+
+    _wait_for_container(container)
+
+    yield container
+
+    with contextlib.suppress(pylxd.exceptions.LXDAPIException, Exception):
+        container.stop(wait=True)
+    with contextlib.suppress(pylxd.exceptions.LXDAPIException, Exception):
+        container.delete(wait=True)
+
+
+@pytest.fixture(scope="session")
+def apk_container(apk_lxd_container: Any) -> Apk:
+    """Return an Apk instance whose commands execute in the LXD container."""
+
+    def container_runner(cmd: list[str], **kwargs: Any) -> subprocess.Popen[Any]:
+        exec_cmd = ["lxc", "exec", apk_lxd_container.name, "--", *cmd]
+        return subprocess.Popen(exec_cmd, **kwargs)
+
+    return Apk(runner=container_runner)
