@@ -56,7 +56,16 @@ class ZypperRefresh(RefreshAction[ZypperRefreshResult]):
         return ["zypper", "--non-interactive", "refresh"]
 
     def interpret(self, stream: IO[str]) -> ZypperRefreshResult:
-        """Parse zypper refresh output."""
+        """Parse zypper refresh output.
+
+        Example command output::
+
+            Building repository 'repo-oss' cache [....done]
+            All repositories have been refreshed.
+
+        Example output:
+            ZypperRefreshResult(repositories_refreshed=True, repo_count=1)
+        """
         repos = 0
         refreshed = False
         for line in stream:
@@ -89,7 +98,15 @@ class ZypperInstall(InstallAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse installed packages from zypper output."""
+        """Parse installed packages from zypper output.
+
+        Example command output::
+
+            (1/1) Installing: tree-2.2.1-160000.2.2.x86_64 [..done]
+
+        Example output:
+            ["tree=2.2.1-160000.2.2"]
+        """
         installed: list[str] = []
         pattern = re.compile(r"Installing:\s+(\S+)")
 
@@ -125,7 +142,15 @@ class ZypperRemove(RemoveAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse removed packages from zypper output."""
+        """Parse removed packages from zypper output.
+
+        Example command output::
+
+            (1/1) Removing: tree-2.2.1-160000.2.2.x86_64 [..done]
+
+        Example output:
+            ["tree"]
+        """
         removed: list[str] = []
         pattern = re.compile(r"Removing:\s+(\S+)")
 
@@ -163,7 +188,15 @@ class ZypperUpgrade(UpgradeAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse upgraded packages from zypper output."""
+        """Parse upgraded packages from zypper output.
+
+        Example command output::
+
+            (1/1) Installing: tree-2.2.1-160000.2.2.x86_64 [..done]
+
+        Example output:
+            ["tree=2.2.1-160000.2.2"]
+        """
         upgraded: list[str] = []
         pattern = re.compile(r"Installing:\s+(\S+)")
 
@@ -189,7 +222,17 @@ class ZypperSearch(SearchAction[dict[str, str]]):
         return ["zypper", "--non-interactive", "search", query]
 
     def interpret(self, stream: IO[str]) -> dict[str, str]:
-        """Parse zypper search table output."""
+        """Parse zypper search table output.
+
+        Example command output::
+
+            S  | Name | Summary                | Type
+            ---+------+------------------------+--------
+            i+ | tree | File listing as a tree | package
+
+        Example output:
+            {"tree": "File listing as a tree"}
+        """
         results: dict[str, str] = {}
         for line in stream:
             if "|" in line and not line.startswith(("-", "S  |", "Loading")):
@@ -211,7 +254,21 @@ class ZypperInfo(InfoAction[dict[str, str]]):
         return ["zypper", "--non-interactive", "info", package]
 
     def interpret(self, stream: IO[str]) -> dict[str, str]:
-        """Parse zypper info key-value output."""
+        """Parse zypper info key-value output.
+
+        Example command output::
+
+            Name : tree
+            Version : 2.2.1
+            Summary : File listing as a tree
+
+        Example output:
+            {
+                "Name": "tree",
+                "Version": "2.2.1",
+                "Summary": "File listing as a tree",
+            }
+        """
         info: dict[str, str] = {}
         current_key: str | None = None
 
@@ -235,7 +292,15 @@ class ZypperListInstalled(ListInstalledAction[list[str]]):
         return ["rpm", "-qa", "--qf", "%{NAME}=%{VERSION}-%{RELEASE}\n"]
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse installed packages into package=version strings."""
+        """Parse installed packages into package=version strings.
+
+        Example command output::
+
+            tree=2.2.1-160000.2.2
+
+        Example output:
+            ["tree=2.2.1-160000.2.2"]
+        """
         return sorted(
             line.strip() for line in stream if line.strip() and "=" in line.strip()
         )
@@ -250,7 +315,15 @@ class ZypperIsInstalled(IsInstalledAction[bool]):
         return ["rpm", "-q", package]
 
     def interpret(self, stream: IO[str]) -> bool:
-        """Parse rpm -q output."""
+        """Parse rpm -q output.
+
+        Example command output::
+
+            tree-2.2.1-160000.2.2.x86_64
+
+        Example output:
+            True
+        """
         content = stream.read().strip()
         if not content:
             return False
@@ -272,7 +345,15 @@ class ZypperDownload(DownloadAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse downloaded package names from zypper output."""
+        """Parse downloaded package names from zypper output.
+
+        Example command output::
+
+            Retrieving: tree-2.2.1-160000.2.2.x86_64 (repo-oss (16.0)) (1/1),  84.2 KiB
+
+        Example output:
+            ["tree"]
+        """
         downloaded: list[str] = []
         pattern = re.compile(r"Retrieving:\s+(\S+)")
 
@@ -300,7 +381,13 @@ class ZypperClean(CleanAction[None]):
         return ["zypper", "--non-interactive", "clean", "-a"]
 
     def interpret(self, stream: IO[str]) -> None:
-        """Return None as zypper clean produces no structured output."""
+        """Parse clean output.
+
+        zypper clean produces no structured output.
+
+        Example output:
+            None
+        """
         del stream
 
 
@@ -313,7 +400,15 @@ class ZypperAutoremove(AutoremoveAction[list[str]]):
         return ["zypper", "--non-interactive", "remove", "--clean-deps", "-y"]
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse removed packages from zypper remove output."""
+        """Parse removed packages from zypper remove output.
+
+        Example command output::
+
+            (1/1) Removing: unused-pkg-1.0-1.x86_64 [..done]
+
+        Example output:
+            ["unused-pkg"]
+        """
         removed: list[str] = []
         pattern = re.compile(r"Removing:\s+(\S+)")
 
