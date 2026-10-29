@@ -55,6 +55,21 @@ from .apt import (
     AptUpgrade,
 )
 from .manager import BasePackageManager
+from .pacman import (
+    Pacman,
+    PacmanAutoremove,
+    PacmanClean,
+    PacmanDownload,
+    PacmanInfo,
+    PacmanInstall,
+    PacmanIsInstalled,
+    PacmanListInstalled,
+    PacmanRefresh,
+    PacmanRefreshResult,
+    PacmanRemove,
+    PacmanSearch,
+    PacmanUpgrade,
+)
 
 __all__ = [
     "Action",
@@ -79,6 +94,19 @@ __all__ = [
     "InstallAction",
     "IsInstalledAction",
     "ListInstalledAction",
+    "Pacman",
+    "PacmanAutoremove",
+    "PacmanClean",
+    "PacmanDownload",
+    "PacmanInfo",
+    "PacmanInstall",
+    "PacmanIsInstalled",
+    "PacmanListInstalled",
+    "PacmanRefresh",
+    "PacmanRefreshResult",
+    "PacmanRemove",
+    "PacmanSearch",
+    "PacmanUpgrade",
     "RefreshAction",
     "RemoveAction",
     "SearchAction",
