@@ -55,6 +55,21 @@ from .apt import (
     AptUpgrade,
 )
 from .manager import BasePackageManager
+from .snap import (
+    Snap,
+    SnapAutoremove,
+    SnapClean,
+    SnapDownload,
+    SnapInfo,
+    SnapInstall,
+    SnapIsInstalled,
+    SnapListInstalled,
+    SnapRefresh,
+    SnapRefreshResult,
+    SnapRemove,
+    SnapSearch,
+    SnapUpgrade,
+)
 
 __all__ = [
     "Action",
@@ -82,6 +97,19 @@ __all__ = [
     "RefreshAction",
     "RemoveAction",
     "SearchAction",
+    "Snap",
+    "SnapAutoremove",
+    "SnapClean",
+    "SnapDownload",
+    "SnapInfo",
+    "SnapInstall",
+    "SnapIsInstalled",
+    "SnapListInstalled",
+    "SnapRefresh",
+    "SnapRefreshResult",
+    "SnapRemove",
+    "SnapSearch",
+    "SnapUpgrade",
     "UpgradeAction",
     "__version__",
 ]
