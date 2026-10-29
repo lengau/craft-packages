@@ -66,7 +66,16 @@ class YumRefresh(RefreshAction[YumRefreshResult]):
         return ["yum", "makecache"]
 
     def interpret(self, stream: IO[str]) -> YumRefreshResult:
-        """Parse yum makecache output."""
+        """Parse yum makecache output.
+
+        Example command output::
+
+            CentOS Stream 9 - BaseOS                          5.4 kB/s | 5.4 kB 00:00
+            Metadata cache created.
+
+        Example output:
+            YumRefreshResult(metadata_cache_created=True, repo_count=1)
+        """
         repos = 0
         cache_created = False
         for line in stream:
@@ -100,7 +109,17 @@ class YumInstall(InstallAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse installed packages from yum output."""
+        """Parse installed packages from yum output.
+
+        Example command output::
+
+            Installed:
+              tree-1.8.0-10.el9.x86_64
+            Complete!
+
+        Example output:
+            ["tree=1.8.0-10.el9"]
+        """
         installed: list[str] = []
         in_section = False
 
@@ -161,7 +180,17 @@ class YumRemove(RemoveAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse removed packages from yum output."""
+        """Parse removed packages from yum output.
+
+        Example command output::
+
+            Removed:
+              tree.x86_64 1.8.0-10.el9
+            Complete!
+
+        Example output:
+            ["tree"]
+        """
         removed: list[str] = []
         in_section = False
 
@@ -205,7 +234,17 @@ class YumUpgrade(UpgradeAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse upgraded packages from yum output."""
+        """Parse upgraded packages from yum output.
+
+        Example command output::
+
+            Upgraded:
+              tree.x86_64 1.8.1-1.el9
+            Complete!
+
+        Example output:
+            ["tree=1.8.1-1.el9"]
+        """
         upgraded: list[str] = []
         in_section = False
 
@@ -249,7 +288,15 @@ class YumSearch(SearchAction[dict[str, str]]):
         return ["yum", "search", query]
 
     def interpret(self, stream: IO[str]) -> dict[str, str]:
-        """Parse yum search output."""
+        """Parse yum search output.
+
+        Example command output::
+
+            tree.x86_64 : File system tree viewer
+
+        Example output:
+            {"tree": "File system tree viewer"}
+        """
         results: dict[str, str] = {}
         for line in stream:
             stripped = line.strip()
@@ -273,7 +320,23 @@ class YumInfo(InfoAction[dict[str, str]]):
         return ["yum", "info", package]
 
     def interpret(self, stream: IO[str]) -> dict[str, str]:
-        """Parse yum info key-value output."""
+        """Parse yum info key-value output.
+
+        Example command output::
+
+            Name         : tree
+            Version      : 1.8.0
+            Release      : 10.el9
+            Description  : File system tree viewer
+
+        Example output:
+            {
+                "Name": "tree",
+                "Version": "1.8.0",
+                "Release": "10.el9",
+                "Description": "File system tree viewer",
+            }
+        """
         info: dict[str, str] = {}
         current_key: str | None = None
 
@@ -298,7 +361,16 @@ class YumListInstalled(ListInstalledAction[list[str]]):
         return ["rpm", "-qa", "--qf", "%{NAME}=%{VERSION}-%{RELEASE}\n"]
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse installed packages into package=version strings."""
+        """Parse installed packages into package=version strings.
+
+        Example command output::
+
+            tree=1.8.0-10.el9
+            tzdata=2024a-1.el9
+
+        Example output:
+            ["tree=1.8.0-10.el9", "tzdata=2024a-1.el9"]
+        """
         return sorted(
             line.strip() for line in stream if line.strip() and "=" in line.strip()
         )
@@ -313,7 +385,15 @@ class YumIsInstalled(IsInstalledAction[bool]):
         return ["rpm", "-q", package]
 
     def interpret(self, stream: IO[str]) -> bool:
-        """Parse rpm -q output."""
+        """Parse rpm -q output.
+
+        Example command output::
+
+            tree-1.8.0-10.el9.x86_64
+
+        Example output:
+            True
+        """
         content = stream.read().strip()
         if not content:
             return False
@@ -339,7 +419,17 @@ class YumDownload(DownloadAction[list[str]]):
         return cmd
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse downloaded package names from yum output."""
+        """Parse downloaded package names from yum output.
+
+        Example command output::
+
+            Downloading Packages:
+            tree-1.8.0-10.el9.x86_64.rpm  56 kB/s | 56 kB 00:00
+            Complete!
+
+        Example output:
+            ["tree"]
+        """
         downloaded: list[str] = []
         in_section = False
         rpm_pattern = re.compile(r"^\s*(\S+)\.rpm")
@@ -376,7 +466,13 @@ class YumClean(CleanAction[None]):
         return ["yum", "clean", "all"]
 
     def interpret(self, stream: IO[str]) -> None:
-        """Return None as yum clean produces no structured output."""
+        """Parse yum clean output.
+
+        yum clean produces no structured output.
+
+        Example output:
+            None
+        """
         del stream
 
 
@@ -389,7 +485,17 @@ class YumAutoremove(AutoremoveAction[list[str]]):
         return ["yum", "autoremove", "-y"]
 
     def interpret(self, stream: IO[str]) -> list[str]:
-        """Parse removed packages from yum autoremove output."""
+        """Parse removed packages from yum autoremove output.
+
+        Example command output::
+
+            Removed:
+              old-dep.x86_64 1.0-1
+            Complete!
+
+        Example output:
+            ["old-dep"]
+        """
         removed: list[str] = []
         in_section = False
 
