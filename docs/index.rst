@@ -1,27 +1,20 @@
-.. starcraft documentation root file
+.. meta::
+    :description: craft-packages is a Python library providing package manager abstractions and wrappers for craft tools.
 
-Starcraft
-=========
 
-.. toctree::
-   :maxdepth: 1
-   :hidden:
+craft-packages
+==============
 
-   tutorials/index
-   how-to-guides/index
-   reference/index
-   explanation/index
-   release-notes/index
-
+**craft-packages** is a Python library providing package manager abstractions and wrappers for craft tools.
 
 .. list-table::
 
     * - | :ref:`Tutorial <tutorials>`
-        | **Get started** with a hands-on introduction to Starcraft
+        | **Get started** with a hands-on introduction to craft-packages
     * - | :ref:`How-to guides <how-to-guides>`
         | **Step-by-step guides** covering key operations and common tasks
     * - | :ref:`Reference <reference>`
-        | **Technical information** about Starcraft
+        | **Technical information** about craft-packages
     * - | :ref:`Explanation <explanation>`
         | **Discussion and clarification** of key topics
 
@@ -29,10 +22,18 @@ Starcraft
 Project and community
 ---------------------
 
-Starcraft is a member of the Canonical family. It's an open source project
+craft-packages is a member of the Canonical family. It's an open source project
 that warmly welcomes community projects, contributions, suggestions, fixes
 and constructive feedback.
 
-* `Ubuntu Code of Conduct <https://ubuntu.com/community/code-of-conduct>`_.
-* `Canonical contributor licenses agreement
-  <https://ubuntu.com/legal/contributors>`_.
+- `Ubuntu Code of Conduct <https://ubuntu.com/community/docs/ethos/code-of-conduct>`__
+- `Canonical Contributor License Agreement <https://ubuntu.com/legal/contributors>`__
+
+
+.. toctree::
+    :hidden:
+
+    tutorials/index
+    how-to/index
+    reference/index
+    explanation/index

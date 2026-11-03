@@ -3,11 +3,15 @@ on:
   push:
     branches:
       - "main"
+      # For troubleshooting
+      - "work/tiobe**"
 
 jobs:
   TICS:
+    permissions:
+      contents: read
     uses: canonical/starflow/.github/workflows/tics.yaml@main
-    # Uncomment this and add your project's name on Tiobe TICS
-    # with:
-    #   project: "starcraft"
-    secrets: inherit
+    with:
+      project: "craft-packages"
+    secrets:
+      TICSAUTHTOKEN: ${{ secrets.TICSAUTHTOKEN }}
