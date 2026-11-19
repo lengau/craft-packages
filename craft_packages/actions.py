@@ -61,8 +61,9 @@ class Action(abc.ABC, Generic[T]):
     ) -> T:
         """Run the command to completion and return interpreted output."""
         proc = self.start(*args, runner_kwargs=runner_kwargs, **kwargs)
-        stdout, _ = proc.communicate()
-        return self.interpret(io.StringIO(stdout))
+        stdout, stderr = proc.communicate()
+        output = stdout if not stderr else f"{stdout}\n{stderr}" if stdout else stderr
+        return self.interpret(io.StringIO(output))
 
     @abc.abstractmethod
     def interpret(self, stream: IO[str]) -> T:
