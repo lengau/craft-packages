@@ -54,6 +54,21 @@ from .apt import (
     AptSearch,
     AptUpgrade,
 )
+from .dnf import (
+    Dnf,
+    DnfAutoremove,
+    DnfClean,
+    DnfDownload,
+    DnfInfo,
+    DnfInstall,
+    DnfIsInstalled,
+    DnfListInstalled,
+    DnfRefresh,
+    DnfRefreshResult,
+    DnfRemove,
+    DnfSearch,
+    DnfUpgrade,
+)
 from .manager import BasePackageManager
 
 __all__ = [
@@ -74,6 +89,19 @@ __all__ = [
     "AutoremoveAction",
     "BasePackageManager",
     "CleanAction",
+    "Dnf",
+    "DnfAutoremove",
+    "DnfClean",
+    "DnfDownload",
+    "DnfInfo",
+    "DnfInstall",
+    "DnfIsInstalled",
+    "DnfListInstalled",
+    "DnfRefresh",
+    "DnfRefreshResult",
+    "DnfRemove",
+    "DnfSearch",
+    "DnfUpgrade",
     "DownloadAction",
     "InfoAction",
     "InstallAction",
