@@ -54,10 +54,38 @@ from .apt import (
     AptSearch,
     AptUpgrade,
 )
+from .apk import (
+    Apk,
+    ApkAutoremove,
+    ApkClean,
+    ApkDownload,
+    ApkInfo,
+    ApkInstall,
+    ApkIsInstalled,
+    ApkListInstalled,
+    ApkRefresh,
+    ApkRefreshResult,
+    ApkRemove,
+    ApkSearch,
+    ApkUpgrade,
+)
 from .manager import BasePackageManager
 
 __all__ = [
     "Action",
+    "Apk",
+    "ApkAutoremove",
+    "ApkClean",
+    "ApkDownload",
+    "ApkInfo",
+    "ApkInstall",
+    "ApkIsInstalled",
+    "ApkListInstalled",
+    "ApkRefresh",
+    "ApkRefreshResult",
+    "ApkRemove",
+    "ApkSearch",
+    "ApkUpgrade",
     "Apt",
     "AptAutoremove",
     "AptClean",
